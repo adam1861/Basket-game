@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Basketball Hand Game</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <div>
+        <p class="eyebrow">Webcam hand-tracking</p>
+        <h1>Basketball Hand Game</h1>
+        <p class="lede">Play in the browser. Allow camera access and use your hands as paddles.</p>
+      </div>
+      <div class="actions">
+        <select id="camera-select" aria-label="Choose camera">
+          <option>Loading cameras...</option>
+        </select>
+        <button id="start-btn" type="button">Enable Camera</button>
+        <button id="reset-btn" type="button">Reset (R)</button>
+        <span id="status" class="status">Loading assets...</span>
+      </div>
+    </header>
+
+    <main class="layout">
+      <div class="stage">
+        <div class="canvas-shell">
+          <canvas id="game-canvas" width="1280" height="720" aria-label="Hand tracked pong court"></canvas>
+          <video id="video" playsinline muted></video>
+          <div class="overlay-hint">Show both hands to move the bats</div>
+        </div>
+      </div>
+
+      <aside class="panel">
+        <div class="panel-card">
+          <h2>How to play</h2>
+          <ul>
+            <li>Allow camera access when prompted.</li>
+            <li>Move your left and right hands to control the bats.</li>
+            <li>Keep the ball in play to rack up points.</li>
+            <li>Press <kbd>R</kbd> or the reset button to restart.</li>
+            <li>Quit by closing the tab (desktop legacy key: <kbd>Q</kbd>).</li>
+          </ul>
+        </div>
+        <div class="panel-card">
+          <h2>Deploy to Vercel</h2>
+          <ol>
+            <li>Push this repo to GitHub (or import it into Vercel).</li>
+            <li>Create a Vercel project and set the output folder to <code>public</code>.</li>
+            <li>Deploy - the game runs fully client-side.</li>
+          </ol>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
