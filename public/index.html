@@ -1,59 +1,26 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Basketball Hand Game</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./style.css">
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="theme-color" content="#0a0a0a">
+<title>E++ | Hand Pong</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./style.css">
+<script defer src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js"></script>
 </head>
-<body>
-  <div class="page">
-    <header class="header">
-      <div>
-        <p class="eyebrow">Webcam hand-tracking</p>
-        <h1>Basketball Hand Game</h1>
-        <p class="lede">Play in the browser. Allow camera access and use your hands as paddles.</p>
-      </div>
-      <div class="actions">
-        <select id="camera-select" aria-label="Choose camera">
-          <option>Loading cameras...</option>
-        </select>
-        <button id="start-btn" type="button">Enable Camera</button>
-        <button id="reset-btn" type="button">Reset (R)</button>
-        <span id="status" class="status">Loading assets...</span>
-      </div>
-    </header>
-
-    <main class="layout">
-      <div class="stage">
-        <div class="canvas-shell">
-          <canvas id="game-canvas" width="1280" height="720" aria-label="Hand tracked pong court"></canvas>
-          <video id="video" playsinline muted></video>
-          <div class="overlay-hint">Show both hands to move the bats</div>
-        </div>
-      </div>
-
-      <aside class="panel">
-        <div class="panel-card">
-          <h2>How to play</h2>
-          <ul>
-            <li>Allow camera access when prompted.</li>
-            <li>Move your left and right hands to control the bats.</li>
-            <li>Keep the ball in play to rack up points.</li>
-            <li>Press <kbd>R</kbd> or the reset button to restart.</li>
-            <li>Quit by closing the tab (desktop legacy key: <kbd>Q</kbd>).</li>
-          </ul>
-        </div>
-      </aside>
-    </main>
-  </div>
-
-  <script type="module" src="./main.js"></script>
-</body>
-</html>
-
+<body><div class="page">
+<div class="brand-bar"><img class="brand-logo" src="./brand/logo.png" alt="E++" width="1260" height="420"><div class="brand-motto">Evolve <span>·</span> Improve <span>·</span> Impact</div></div>
+<header class="header"><div><p class="eyebrow">E++ / Play. Learn. Evolve.</p><h1>Hand Pong<span>_</span></h1><p class="lede">Two paddles. Three lives. How long can you keep it going?</p></div><div class="badge">LOCAL PLAY · NO SIGN-UP</div></header>
+<main><div class="toolbar">
+<label>Controls<select id="control-mode"><option value="hands">Hand tracking</option><option value="keyboard">Keyboard</option></select></label>
+<label>Difficulty <span class="small">(starts new game)</span><select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label>
+<label>Camera<select id="camera-select"><option value="">Default camera</option></select></label>
+<button id="start-btn">Enable camera</button><button id="calibrate-btn" class="secondary">Calibrate</button></div>
+<section id="stage" class="stage" aria-label="Hand Pong game">
+<div class="scoreboard"><div><span>Score</span><strong id="score">0</strong></div><div><span>Best · all modes</span><strong id="best">0</strong></div><div><span>Rally</span><strong id="rally">0</strong></div><div><span>Lives</span><strong id="lives" aria-label="Remaining lives">♥♥♥</strong></div></div>
+<div class="canvas-shell"><canvas id="game-canvas" width="1280" height="720" aria-label="Pong court. Keyboard: W and S for left paddle, up and down arrows for right paddle.">Use a browser with canvas support to play Hand Pong.</canvas><video id="video" playsinline muted aria-label="Your camera preview"></video></div>
+<div class="game-footer"><span id="tracking">Left ○ · Right ○</span><div><button id="pause-btn" class="secondary">Pause</button><button id="reset-btn" class="secondary">Restart (R)</button><button id="fullscreen-btn" class="secondary">Fullscreen</button></div></div></section>
+<p id="status" role="status">Choose your controls to begin.</p>
+<div class="below"><section><h2>Your hands are the controllers.</h2><p>Enable your camera and move both hands up and down for a four-second calibration. Keep both hands visible. Tracking loss pauses play after a brief grace period.</p><p>Using a keyboard? Move the left paddle with <kbd>W</kbd> / <kbd>S</kbd> and the right with <kbd>↑</kbd> / <kbd>↓</kbd>. <kbd>Space</kbd> pauses. <kbd>R</kbd> restarts.</p></section><section><h2>Build your rally.</h2><p>Hit near a paddle’s edge for a sharper angle. Every return adds a point and a little speed. Miss three times and the run ends. Your best score stays on this device.</p><div class="preferences"><label><input id="preview" type="checkbox" checked> Camera preview</label><label><input id="sound" type="checkbox"> Hit sounds</label></div><p class="small">Camera frames are processed in your browser. Hand tracking loads from a CDN.</p></section></div>
+</main><footer class="brand-footer"><strong>We don’t follow. We evolve.</strong><span>Together we evolve. / E++</span></footer></div><script type="module" src="./main.js"></script></body></html>

@@ -1,370 +1,198 @@
-const canvas = document.getElementById("game-canvas");
-const ctx = canvas.getContext("2d");
-const video = document.getElementById("video");
-const statusEl = document.getElementById("status");
-const resetBtn = document.getElementById("reset-btn");
-const startBtn = document.getElementById("start-btn");
-const cameraSelect = document.getElementById("camera-select");
-const hintEl = document.querySelector(".overlay-hint");
-
-const WIDTH = canvas.width;
-const HEIGHT = canvas.height;
-
-const assetPaths = {
-  background: "./Resources/Background.png",
-  gameOver: "./Resources/gameOver.png",
-  ball: "./Resources/Ball.png",
-  batLeft: "./Resources/bat1.png",
-  batRight: "./Resources/bat2.png",
-};
-
-const assets = {};
-const state = {
-  ballX: 180,
-  ballY: 220,
-  speedX: 12,
-  speedY: 10,
-  scoreLeft: 0,
-  scoreRight: 0,
-  gameOver: false,
-  ready: false,
-  lastHandsAt: 0,
-  cameraStarted: false,
-  cameraStarting: false,
-  selectedDeviceId: null,
-  stream: null,
-  frameReq: null,
-  processingFrame: false,
-};
-
-let handsInstance = null;
-
-const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
-
-const loadAssets = async () => {
-  const entries = await Promise.all(
-    Object.entries(assetPaths).map(
-      ([key, src]) =>
-        new Promise((resolve, reject) => {
-          const img = new Image();
-          img.onload = () => resolve([key, img]);
-          img.onerror = () => reject(new Error(`Failed to load ${src}`));
-          img.src = src;
-        }),
-    ),
-  );
-
-  entries.forEach(([key, img]) => {
-    assets[key] = img;
-  });
-  state.ready = true;
-};
-
-const resetGame = () => {
-  state.ballX = 200;
-  state.ballY = 200;
-  state.speedX = 12;
-  state.speedY = 10;
-  state.scoreLeft = 0;
-  state.scoreRight = 0;
-  state.gameOver = false;
-  setStatus("Ready - show your hands to move the bats");
-};
-
-const setStatus = (msg) => {
-  statusEl.textContent = msg;
-};
-
-const computeHandBoxes = (results) => {
-  const boxes = [];
-  const { multiHandLandmarks, multiHandedness } = results;
-  if (!multiHandLandmarks || !multiHandedness) {
-    return boxes;
-  }
-
-  multiHandLandmarks.forEach((landmarks, i) => {
-    const handed = multiHandedness[i];
-    const xs = landmarks.map((p) => p.x * WIDTH);
-    const ys = landmarks.map((p) => p.y * HEIGHT);
-    const minX = Math.min(...xs);
-    const maxX = Math.max(...xs);
-    const minY = Math.min(...ys);
-    const maxY = Math.max(...ys);
-    boxes.push({
-      x: minX,
-      y: minY,
-      w: maxX - minX,
-      h: maxY - minY,
-      label: handed?.label || "Unknown",
-    });
-  });
-
-  return boxes;
-};
-
-const checkPaddleCollision = (box, ballW, ballH) => {
-  const paddleH = assets.batLeft.height;
-  const paddleW = assets.batLeft.width;
-  const paddleMargin = 48;
-  const centerY = box.y + box.h / 2;
-  const y = clamp(centerY - paddleH / 2, 20, HEIGHT - paddleH - 20);
-
-  if (box.label === "Left") {
-    ctx.drawImage(assets.batLeft, paddleMargin, y, paddleW, paddleH);
-    const intersectsX =
-      state.ballX <= paddleMargin + paddleW &&
-      state.ballX + ballW >= paddleMargin;
-    const intersectsY =
-      state.ballY + ballH >= y && state.ballY <= y + paddleH;
-    if (!state.gameOver && intersectsX && intersectsY) {
-      state.speedX = Math.abs(state.speedX);
-      state.ballX = paddleMargin + paddleW + 6;
-      state.scoreLeft += 1;
-    }
-  } else if (box.label === "Right") {
-    const paddleX = WIDTH - paddleMargin - paddleW;
-    ctx.drawImage(assets.batRight, paddleX, y, paddleW, paddleH);
-    const intersectsX =
-      state.ballX + ballW >= paddleX && state.ballX <= paddleX + paddleW;
-    const intersectsY =
-      state.ballY + ballH >= y && state.ballY <= y + paddleH;
-    if (!state.gameOver && intersectsX && intersectsY) {
-      state.speedX = -Math.abs(state.speedX);
-      state.ballX = paddleX - ballW - 6;
-      state.scoreRight += 1;
-    }
-  }
-};
-
-const drawScore = () => {
-  ctx.fillStyle = "#ffffff";
-  ctx.font = '48px "Space Grotesk", sans-serif';
-  ctx.fillText(String(state.scoreLeft).padStart(2, "0"), 280, HEIGHT - 40);
-  ctx.fillText(String(state.scoreRight).padStart(2, "0"), WIDTH - 360, HEIGHT - 40);
-};
-
-const renderFrame = (handBoxes) => {
-  if (!state.ready) return;
-
-  const ballW = assets.ball.width;
-  const ballH = assets.ball.height;
-
-  ctx.clearRect(0, 0, WIDTH, HEIGHT);
-  ctx.drawImage(assets.background, 0, 0, WIDTH, HEIGHT);
-
-  handBoxes.forEach((box) => checkPaddleCollision(box, ballW, ballH));
-
-  if (!state.gameOver) {
-    if (state.ballY <= 0 || state.ballY + ballH >= HEIGHT) {
-      state.speedY = -state.speedY;
-    }
-
-    state.ballX += state.speedX;
-    state.ballY += state.speedY;
-
-    ctx.drawImage(assets.ball, state.ballX, state.ballY, ballW, ballH);
-
-    const outOfBounds =
-      state.ballX < 12 || state.ballX + ballW > WIDTH - 12;
-    if (outOfBounds) {
-      state.gameOver = true;
-      setStatus("Game over - press reset or R to try again");
-    }
-  } else {
-    ctx.drawImage(assets.gameOver, 0, 0, WIDTH, HEIGHT);
-    ctx.fillStyle = "#e0115f";
-    ctx.font = '64px "Space Grotesk", sans-serif';
-    const totalScore = state.scoreLeft + state.scoreRight;
-    ctx.fillText(String(totalScore).padStart(2, "0"), WIDTH / 2 - 32, HEIGHT / 2 + 16);
-  }
-
-  drawScore();
-};
-
-const onResults = (results) => {
-  const handBoxes = computeHandBoxes(results);
-  if (handBoxes.length) {
-    state.lastHandsAt = Date.now();
-    hintEl.textContent = "Hands detected - keep the ball alive!";
-  } else if (Date.now() - state.lastHandsAt > 1000) {
-    hintEl.textContent = "Show both hands to move the bats";
-  }
-  renderFrame(handBoxes);
-};
-
-const ensureHands = async () => {
-  if (handsInstance) return handsInstance;
-  if (typeof Hands === "undefined") {
-    throw new Error("MediaPipe scripts failed to load.");
-  }
-  handsInstance = new Hands({
-    locateFile: (file) =>
-      `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
-  });
-  handsInstance.setOptions({
-    maxNumHands: 2,
-    modelComplexity: 1,
-    selfieMode: true,
-    minDetectionConfidence: 0.6,
-    minTrackingConfidence: 0.5,
-  });
-  handsInstance.onResults(onResults);
-  return handsInstance;
-};
-
-const stopCamera = () => {
-  if (state.frameReq) {
-    cancelAnimationFrame(state.frameReq);
-    state.frameReq = null;
-  }
-  if (state.stream) {
-    state.stream.getTracks().forEach((t) => t.stop());
-    state.stream = null;
-  }
-  state.cameraStarted = false;
-};
-
-const startFrameLoop = () => {
-  const step = async () => {
-    if (!state.cameraStarted || !handsInstance) return;
-    if (video.readyState >= 2 && !state.processingFrame) {
-      state.processingFrame = true;
-      try {
-        await handsInstance.send({ image: video });
-      } catch (err) {
-        console.error(err);
-      } finally {
-        state.processingFrame = false;
-      }
-    }
-    state.frameReq = requestAnimationFrame(step);
-  };
-
-  if (state.frameReq) {
-    cancelAnimationFrame(state.frameReq);
-  }
-  state.frameReq = requestAnimationFrame(step);
-};
-
-const populateCameras = async () => {
-  if (!navigator.mediaDevices?.enumerateDevices) {
-    cameraSelect.innerHTML = "<option>Camera API not supported</option>";
-    return 0;
-  }
-
-  const devices = await navigator.mediaDevices.enumerateDevices();
-  const videoInputs = devices.filter((d) => d.kind === "videoinput");
-  cameraSelect.innerHTML = "";
-
-  if (!videoInputs.length) {
-    cameraSelect.innerHTML = "<option>No camera found</option>";
-    return 0;
-  }
-
-  const preferPcCam =
-    videoInputs.find((d) => !/phone|android|iphone|ipad|redmi|note|galaxy/i.test(d.label || "")) ||
-    videoInputs[0];
-
-  videoInputs.forEach((device, idx) => {
-    const option = document.createElement("option");
-    option.value = device.deviceId;
-    option.textContent = device.label || `Camera ${idx + 1}`;
-    cameraSelect.appendChild(option);
-  });
-
-  if (state.selectedDeviceId && videoInputs.some((d) => d.deviceId === state.selectedDeviceId)) {
-    cameraSelect.value = state.selectedDeviceId;
-  } else if (preferPcCam) {
-    cameraSelect.value = preferPcCam.deviceId;
-    state.selectedDeviceId = preferPcCam.deviceId;
-  }
-
-  return videoInputs.length;
-};
-
-const startCamera = async () => {
-  if (!navigator.mediaDevices?.getUserMedia) {
-    setStatus("Camera API not supported in this browser");
-    return;
-  }
-  if (state.cameraStarting) {
-    setStatus("Camera is starting...");
-    return;
-  }
-
-  state.cameraStarting = true;
-  setStatus("Requesting camera permission...");
-
-  stopCamera();
-
+import { WIDTH, HEIGHT, MODES, clamp, createGame, serve, stepPhysics } from './physics.mjs';
+const $ = (id) => document.getElementById(id);
+const canvas = $('game-canvas'), ctx = canvas.getContext('2d'), video = $('video');
+let game = createGame(), phase = 'idle', countdown = 3, accumulator = 0, previous = 0;
+let stream = null, hands = null, busy = false, starting = false, generation = 0, inferenceGeneration = -1;
+let calibrated = false, calibrationTime = 0, stableTime = 0, manualPause = false;
+let samples = [[], []], ranges = [[.2, .8], [.2, .8]];
+let seen = [-Infinity, -Infinity], positions = [.5, .5], keys = new Set();
+let best = 0, announcement = '', announcementUntil = 0, audio = null;
+try { best = Number(localStorage.getItem('hand-pong-best')) || 0; } catch { /* Storage is optional. */ }
+const keyboard = () => $('control-mode').value === 'keyboard';
+const status = (message) => { if ($('status').textContent !== message) $('status').textContent = message; };
+const tracked = (now) => keyboard() || (stream && seen.every((time) => now - time < 500));
+function sound(frequency = 520) {
+  if (!$('sound').checked) return;
   try {
-    await ensureHands();
-    await populateCameras(); // refresh labels after permission
-
-    const constraints = {
-      video: {
-        deviceId: state.selectedDeviceId ? { exact: state.selectedDeviceId } : undefined,
-        width: { ideal: WIDTH },
-        height: { ideal: HEIGHT },
-        facingMode: "user",
-      },
-    };
-
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    state.stream = stream;
-
-    const track = stream.getVideoTracks()[0];
-    const settings = track?.getSettings?.();
-    if (settings?.deviceId) {
-      state.selectedDeviceId = settings.deviceId;
-      cameraSelect.value = settings.deviceId;
-    }
-
-    video.srcObject = stream;
-    await video.play();
-
-    state.cameraStarted = true;
-    setStatus("Camera ready - raise your hands to play");
-    hintEl.textContent = "Show both hands to move the bats";
-    startFrameLoop();
-  } catch (err) {
-    console.error(err);
-    setStatus(err?.message || "Unable to start camera. Check permissions.");
-  } finally {
-    state.cameraStarting = false;
-  }
-};
-
-const bootstrap = async () => {
+    audio ||= new AudioContext(); void audio.resume();
+    const oscillator = audio.createOscillator(), gain = audio.createGain();
+    oscillator.frequency.value = frequency; gain.gain.setValueAtTime(.05, audio.currentTime);
+    gain.gain.exponentialRampToValueAtTime(.001, audio.currentTime + .09);
+    oscillator.connect(gain).connect(audio.destination); oscillator.start(); oscillator.stop(audio.currentTime + .1);
+  } catch { /* Audio must never interrupt a game. */ }
+}
+function reset() {
+  game = createGame($('difficulty').value); accumulator = 0; manualPause = false; stableTime = 0; announcementUntil = 0;
+  phase = keyboard() || calibrated ? 'waiting' : 'idle';
+  if (stream && !calibrated && !keyboard()) calibrate();
+  status(keyboard() ? 'Keyboard ready. Get set!' : 'Enable your camera, then calibrate your hands.');
+}
+function calibrate() {
+  if (!stream || keyboard() || game.lives <= 0) return;
+  calibrated = false; calibrationTime = 0; samples = [[], []]; phase = 'calibrating'; manualPause = false; accumulator = 0;
+}
+function stopCamera() {
+  generation++; stream?.getTracks().forEach((track) => track.stop());
+  stream = null; video.srcObject = null; seen = [-Infinity, -Infinity];
+  if (phase === 'calibrating') phase = 'idle';
+  $('start-btn').textContent = 'Enable camera';
+}
+async function populateCameras() {
+  if (!navigator.mediaDevices?.enumerateDevices) return;
+  const selected = $('camera-select').value;
+  const devices = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput');
+  $('camera-select').replaceChildren(new Option('Default camera', ''));
+  devices.forEach((device, i) => $('camera-select').add(new Option(device.label || `Camera ${i + 1}`, device.deviceId)));
+  if (devices.some((d) => d.deviceId === selected)) $('camera-select').value = selected;
+}
+function cameraError(error) {
+  return ({ NotAllowedError: 'Camera permission denied. Allow camera access in your browser, or choose Keyboard.',
+    NotFoundError: 'No camera found. Connect a webcam or choose Keyboard.',
+    NotReadableError: 'Camera is busy. Close other camera apps and try again.',
+    OverconstrainedError: 'Selected camera is unavailable. Choose Default camera and retry.',
+    SecurityError: 'Camera access requires HTTPS or localhost. You can still use Keyboard.' })[error.name] || `Camera could not start: ${error.message}. Try again or choose Keyboard.`;
+}
+async function startCamera() {
+  if (starting) return;
+  if (!navigator.mediaDevices?.getUserMedia) { status('Camera requires HTTPS or localhost and a supported browser. Choose Keyboard to play now.'); return; }
+  starting = true; $('start-btn').disabled = true; stopCamera(); const token = generation;
+  status('Starting camera and hand tracking…');
   try {
-    await loadAssets();
-    resetGame();
-    renderFrame([]);
+    if (typeof window.Hands !== 'function') throw new Error('Hand tracking failed to load; check your connection');
+    if (!hands) {
+      hands = new window.Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}` });
+      hands.setOptions({ maxNumHands: 2, modelComplexity: 1, selfieMode: true, minDetectionConfidence: .65, minTrackingConfidence: .6 });
+      hands.onResults((results) => {
+        if (!stream || keyboard() || inferenceGeneration !== generation) return;
+        (results.multiHandLandmarks || []).forEach((landmarks, i) => {
+          const label = results.multiHandedness?.[i]?.label;
+          if (!['Left', 'Right'].includes(label)) return;
+          const side = label === 'Left' ? 0 : 1;
+          positions[side] = (landmarks[0].y + landmarks[9].y) / 2; seen[side] = performance.now();
+          if (phase === 'calibrating') samples[side].push(positions[side]);
+        });
+      });
+    }
+    const deviceId = $('camera-select').value;
+    const acquired = await navigator.mediaDevices.getUserMedia({ video: { deviceId: deviceId ? { exact: deviceId } : undefined, width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }, audio: false });
+    if (token !== generation) { acquired.getTracks().forEach((track) => track.stop()); return; }
+    stream = acquired; video.srcObject = stream; await video.play();
+    if (token !== generation) return;
+    $('control-mode').value = 'hands'; $('start-btn').textContent = 'Restart camera';
+    stream.getVideoTracks()[0].addEventListener('ended', () => { if (token === generation) { stopCamera(); status('Camera disconnected. Reconnect it or choose Keyboard.'); } });
     await populateCameras();
-  } catch (err) {
-    console.error(err);
-    setStatus(err.message || "Unable to initialize.");
+    if (token === generation) { if (game.lives <= 0) reset(); calibrate(); }
+  } catch (error) { if (token === generation) { stopCamera(); status(cameraError(error)); } }
+  finally { starting = false; $('start-btn').disabled = false; }
+}
+function update(dt, now) {
+  const available = tracked(now);
+  $('tracking').textContent = keyboard() ? 'Keyboard controls active' : `Left ${now - seen[0] < 500 ? '●' : '○'}  ·  Right ${now - seen[1] < 500 ? '●' : '○'}`;
+  const half = MODES[game.difficulty].paddle / 2;
+  game.paddles.forEach((y, side) => {
+    if (keyboard()) {
+      const up = side === 0 ? 'w' : 'arrowup', down = side === 0 ? 's' : 'arrowdown';
+      game.paddles[side] = clamp(y + ((keys.has(down) ? 1 : 0) - (keys.has(up) ? 1 : 0)) * 650 * dt, half, HEIGHT - half);
+    } else if (now - seen[side] < 500) {
+      const [min, max] = ranges[side];
+      const target = half + clamp((positions[side] - min) / (max - min), 0, 1) * (HEIGHT - 2 * half);
+      game.paddles[side] = y + (target - y) * (1 - Math.exp(-14 * dt));
+    }
+  });
+  if (phase === 'calibrating') {
+    if (available) calibrationTime += dt;
+    status(available ? `Calibration: move BOTH hands comfortably up and down · ${Math.ceil(4 - calibrationTime)}s` : 'Calibration: show both hands to continue.');
+    if (calibrationTime >= 4) {
+      const measured = samples.map((values) => { const sorted = [...values].sort((a, b) => a - b); return [sorted[Math.floor(sorted.length * .05)], sorted[Math.floor(sorted.length * .95)]]; });
+      if (measured.some(([min, max]) => !Number.isFinite(min) || max - min < .12)) {
+        calibrationTime = 0; samples = [[], []]; announcement = 'Move BOTH hands farther up and down'; announcementUntil = now + 3000;
+      } else { ranges = measured; calibrated = true; phase = 'waiting'; stableTime = 0; }
+    }
+    return;
   }
-};
-
-resetBtn.addEventListener("click", resetGame);
-startBtn.addEventListener("click", startCamera);
-cameraSelect.addEventListener("change", () => {
-  state.selectedDeviceId = cameraSelect.value || null;
-  if (state.cameraStarted) {
-    startCamera();
+  if (manualPause || phase === 'idle' || phase === 'over') return;
+  if (!available) {
+    phase = 'waiting'; stableTime = 0; accumulator = 0;
+    if (stream) status('Paused — show both hands to resume.');
+    return;
   }
-});
-
-document.addEventListener("keydown", (event) => {
+  if (phase === 'waiting') {
+    stableTime += dt; status('Hold steady…');
+    if (stableTime >= .6) { phase = 'countdown'; countdown = 3; } return;
+  }
+  if (phase === 'countdown') {
+    countdown -= dt; status(`Ready in ${Math.max(1, Math.ceil(countdown))}…`);
+    if (countdown <= 0) { phase = 'playing'; status('Keep the rally alive!'); } return;
+  }
+  accumulator += dt;
+  while (accumulator >= 1 / 240) {
+    accumulator -= 1 / 240; const event = stepPhysics(game, 1 / 240);
+    if (event === 'hit') {
+      sound();
+      if (game.score > best) { best = game.score; try { localStorage.setItem('hand-pong-best', String(best)); } catch { /* Storage may be disabled. */ } }
+      if (game.rally % 10 === 0) { announcement = `${game.rally} HIT RALLY!`; announcementUntil = now + 1800; sound(880); }
+    }
+    if (event === 'miss') {
+      sound(160); accumulator = 0;
+      if (game.lives <= 0) { phase = 'over'; status(`Game over · ${game.score} points. Press R to play again.`); }
+      else { serve(game, game.ball.vx > 0 ? -1 : 1); phase = 'waiting'; stableTime = 0; } break;
+    }
+  }
+}
+function draw(now) {
+  ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  ctx.strokeStyle = '#25352b'; ctx.lineWidth = 2; ctx.setLineDash([10, 16]);
+  ctx.beginPath(); ctx.moveTo(WIDTH / 2, 24); ctx.lineTo(WIDTH / 2, HEIGHT - 24); ctx.stroke(); ctx.setLineDash([]);
+  const height = MODES[game.difficulty].paddle;
+  game.paddles.forEach((y, side) => { ctx.fillStyle = side === 0 ? '#00e676' : '#69f0ae'; ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 18; ctx.fillRect(side === 0 ? 56 : WIDTH - 72, y - height / 2, 16, height); });
+  ctx.shadowBlur = 0; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(game.ball.x, game.ball.y, game.ball.r, 0, Math.PI * 2); ctx.fill();
+  if (phase !== 'playing' || manualPause) {
+    ctx.fillStyle = '#0a0a0ae6'; ctx.fillRect(150, 230, WIDTH - 300, 250); ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.font = '900 48px Inter, sans-serif';
+    const title = manualPause ? 'PAUSED' : ({ idle: 'HAND PONG', calibrating: 'FIND YOUR RANGE', waiting: 'GET READY', countdown: String(Math.max(1, Math.ceil(countdown))), over: 'NICE RUN' })[phase];
+    ctx.fillText(title, WIDTH / 2, 325); ctx.font = '24px Inter, sans-serif'; ctx.fillStyle = '#b7c4bc';
+    ctx.fillText(phase === 'over' ? `${game.score} points · Press R to play again` : phase === 'calibrating' ? 'Move both hands up and down' : manualPause ? 'Press Space or Resume to continue' : keyboard() ? 'Left: W / S     Right: ↑ / ↓' : 'Show both hands · or choose Keyboard', WIDTH / 2, 385);
+  }
+  if (now < announcementUntil) { ctx.textAlign = 'center'; ctx.font = '900 30px Inter, sans-serif'; ctx.fillStyle = '#00e676'; ctx.fillText(announcement, WIDTH / 2, 90); }
+  $('score').textContent = game.score; $('best').textContent = best; $('lives').textContent = '♥'.repeat(game.lives) || '0'; $('rally').textContent = game.rally;
+  $('pause-btn').textContent = manualPause ? 'Resume' : 'Pause';
+  $('calibrate-btn').disabled = !stream || keyboard() || phase === 'over';
+}
+function frame(now) {
+  const dt = Math.min((now - previous) / 1000 || 0, .1); previous = now;
+  if (!document.hidden) { update(dt, now); draw(now); }
+  if (stream && !keyboard() && hands && !busy && video.readyState >= 2 && !document.hidden) {
+    busy = true; const token = generation; inferenceGeneration = token;
+    hands.send({ image: video }).catch(() => { if (token === generation) { stopCamera(); status('Hand tracking stopped. Restart the camera or choose Keyboard.'); } }).finally(() => { busy = false; });
+  }
+  requestAnimationFrame(frame);
+}
+function pause() {
+  if (['idle', 'calibrating', 'over'].includes(phase)) return;
+  manualPause = !manualPause; keys.clear(); accumulator = 0;
+  if (!manualPause) { phase = 'waiting'; stableTime = 0; }
+  status(manualPause ? 'Paused. Press Space or Resume.' : 'Get ready to resume…');
+}
+$('start-btn').addEventListener('click', startCamera);
+$('reset-btn').addEventListener('click', reset);
+$('calibrate-btn').addEventListener('click', calibrate);
+$('pause-btn').addEventListener('click', pause);
+$('difficulty').addEventListener('change', () => { reset(); $('difficulty').blur(); });
+$('control-mode').addEventListener('change', () => { stopCamera(); calibrated = false; keys.clear(); reset(); $('control-mode').blur(); });
+$('camera-select').addEventListener('change', () => { if (stream) void startCamera(); });
+$('preview').addEventListener('change', () => { video.hidden = !$('preview').checked; });
+$('sound').addEventListener('change', () => sound());
+$('fullscreen-btn').addEventListener('click', async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await $('stage').requestFullscreen(); } catch { status('Fullscreen is unavailable in this browser.'); } });
+document.addEventListener('fullscreenchange', () => { $('fullscreen-btn').textContent = document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen'; });
+document.addEventListener('keydown', (event) => {
   const key = event.key.toLowerCase();
-  if (key === "r") {
-    resetGame();
-  }
+  if (['INPUT', 'SELECT', 'TEXTAREA'].includes(event.target.tagName) || (event.target.tagName === 'BUTTON' && key === ' ')) return;
+  if (['arrowup', 'arrowdown', ' '].includes(key)) event.preventDefault(); keys.add(key);
+  if (!event.repeat && key === 'r') reset(); if (!event.repeat && key === ' ') pause();
 });
-
-window.addEventListener("beforeunload", () => {
-  stopCamera();
-});
-
-bootstrap();
+document.addEventListener('keyup', (event) => keys.delete(event.key.toLowerCase()));
+function loseFocus() { keys.clear(); if (phase === 'playing' || phase === 'countdown') { manualPause = true; accumulator = 0; status('Paused while you were away. Press Resume.'); } }
+window.addEventListener('blur', loseFocus);
+document.addEventListener('visibilitychange', () => { if (document.hidden) loseFocus(); previous = performance.now(); });
+window.addEventListener('pagehide', stopCamera);
+populateCameras().catch(() => status('Camera list unavailable. Try Enable camera or choose Keyboard.'));
+reset(); requestAnimationFrame(frame);
