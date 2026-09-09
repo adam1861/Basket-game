@@ -29,6 +29,8 @@ function recordRun() {
   renderLeaderboard();
 }
 const keyboard = () => $('control-mode').value === 'keyboard';
+const fingers = () => $('control-mode').value === 'fingers';
+const cameraControls = () => !keyboard();
 const status = (message) => { if ($('status').textContent !== message) $('status').textContent = message; };
 const tracked = (now) => keyboard() || (stream && seen.every((time) => now - time < 500));
 function sound(frequency = 520) {
@@ -46,10 +48,10 @@ function reset() {
   runRecorded = false;
   phase = keyboard() || calibrated ? 'waiting' : 'idle';
   if (stream && !calibrated && !keyboard()) calibrate();
-  status(keyboard() ? 'Keyboard ready. Get set!' : 'Enable your camera, then calibrate your hands.');
+  status(keyboard() ? 'Keyboard ready. Get set!' : `Enable your camera, then calibrate your ${fingers() ? 'fingers' : 'hands'}.`);
 }
 function calibrate() {
-  if (!stream || keyboard() || game.lives <= 0) return;
+  if (!stream || !cameraControls() || game.lives <= 0) return;
   calibrated = false; calibrationTime = 0; samples = [[], []]; phase = 'calibrating'; manualPause = false; accumulator = 0;
 }
 function stopCamera() {
@@ -77,9 +79,9 @@ async function startCamera() {
   if (starting) return;
   if (!navigator.mediaDevices?.getUserMedia) { status('Camera requires HTTPS or localhost and a supported browser. Choose Keyboard to play now.'); return; }
   starting = true; $('start-btn').disabled = true; stopCamera(); const token = generation;
-  status('Starting camera and hand tracking…');
+  status(`Starting camera and ${fingers() ? 'finger' : 'hand'} tracking…`);
   try {
-    if (typeof window.Hands !== 'function') throw new Error('Hand tracking failed to load; check your connection');
+    if (typeof window.Hands !== 'function') throw new Error('Tracking failed to load; check your connection');
     if (!hands) {
       hands = new window.Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}` });
       hands.setOptions({ maxNumHands: 2, modelComplexity: 1, selfieMode: true, minDetectionConfidence: .65, minTrackingConfidence: .6 });
@@ -89,7 +91,7 @@ async function startCamera() {
           const label = results.multiHandedness?.[i]?.label;
           if (!['Left', 'Right'].includes(label)) return;
           const side = label === 'Left' ? 0 : 1;
-          positions[side] = (landmarks[0].y + landmarks[9].y) / 2; seen[side] = performance.now();
+          positions[side] = fingers() ? landmarks[8].y : (landmarks[0].y + landmarks[9].y) / 2; seen[side] = performance.now();
           if (phase === 'calibrating') samples[side].push(positions[side]);
         });
       });
@@ -99,7 +101,7 @@ async function startCamera() {
     if (token !== generation) { acquired.getTracks().forEach((track) => track.stop()); return; }
     stream = acquired; video.srcObject = stream; await video.play();
     if (token !== generation) return;
-    $('control-mode').value = 'hands'; $('start-btn').textContent = 'Restart camera';
+    $('start-btn').textContent = 'Restart camera';
     stream.getVideoTracks()[0].addEventListener('ended', () => { if (token === generation) { stopCamera(); status('Camera disconnected. Reconnect it or choose Keyboard.'); } });
     await populateCameras();
     if (token === generation) { if (game.lives <= 0) reset(); calibrate(); }
@@ -108,7 +110,7 @@ async function startCamera() {
 }
 function update(dt, now) {
   const available = tracked(now);
-  $('tracking').textContent = keyboard() ? 'Keyboard controls active' : `Left ${now - seen[0] < 500 ? '●' : '○'}  ·  Right ${now - seen[1] < 500 ? '●' : '○'}`;
+  $('tracking').textContent = keyboard() ? 'Keyboard controls active' : `${fingers() ? 'Fingers' : 'Hands'} · Left ${now - seen[0] < 500 ? '●' : '○'}  ·  Right ${now - seen[1] < 500 ? '●' : '○'}`;
   const half = MODES[game.difficulty].paddle / 2;
   game.paddles.forEach((y, side) => {
     if (keyboard()) {
@@ -122,7 +124,7 @@ function update(dt, now) {
   });
   if (phase === 'calibrating') {
     if (available) calibrationTime += dt;
-    status(available ? `Calibration: move BOTH hands comfortably up and down · ${Math.ceil(4 - calibrationTime)}s` : 'Calibration: show both hands to continue.');
+    status(available ? `Calibration: move BOTH ${fingers() ? 'index fingers' : 'hands'} comfortably up and down · ${Math.ceil(4 - calibrationTime)}s` : `Calibration: show both ${fingers() ? 'index fingers' : 'hands'} to continue.`);
     if (calibrationTime >= 4) {
       const measured = samples.map((values) => { const sorted = [...values].sort((a, b) => a - b); return [sorted[Math.floor(sorted.length * .05)], sorted[Math.floor(sorted.length * .95)]]; });
       if (measured.some(([min, max]) => !Number.isFinite(min) || max - min < .12)) {
@@ -134,7 +136,7 @@ function update(dt, now) {
   if (manualPause || phase === 'idle' || phase === 'over') return;
   if (!available) {
     phase = 'waiting'; stableTime = 0; accumulator = 0;
-    if (stream) status('Paused — show both hands to resume.');
+    if (stream) status(`Paused — show both ${fingers() ? 'index fingers' : 'hands'} to resume.`);
     return;
   }
   if (phase === 'waiting') {
@@ -171,19 +173,19 @@ function draw(now) {
     ctx.fillStyle = '#0a0a0ae6'; ctx.fillRect(150, 230, WIDTH - 300, 250); ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.font = '900 48px Inter, sans-serif';
     const title = manualPause ? 'PAUSED' : ({ idle: 'HAND PONG', calibrating: 'FIND YOUR RANGE', waiting: 'GET READY', countdown: String(Math.max(1, Math.ceil(countdown))), over: 'NICE RUN' })[phase];
     ctx.fillText(title, WIDTH / 2, 325); ctx.font = '24px Inter, sans-serif'; ctx.fillStyle = '#b7c4bc';
-    ctx.fillText(phase === 'over' ? `${game.score} points · Press R to play again` : phase === 'calibrating' ? 'Move both hands up and down' : manualPause ? 'Press Space or Resume to continue' : keyboard() ? 'Left: W / S     Right: ↑ / ↓' : 'Show both hands · or choose Keyboard', WIDTH / 2, 385);
+    ctx.fillText(phase === 'over' ? `${game.score} points · Press R to play again` : phase === 'calibrating' ? `Move both ${fingers() ? 'index fingers' : 'hands'} up and down` : manualPause ? 'Press Space or Resume to continue' : keyboard() ? 'Left: W / S     Right: ↑ / ↓' : `Show both ${fingers() ? 'index fingers' : 'hands'} · or choose Keyboard`, WIDTH / 2, 385);
   }
   if (now < announcementUntil) { ctx.textAlign = 'center'; ctx.font = '900 30px Inter, sans-serif'; ctx.fillStyle = '#00e676'; ctx.fillText(announcement, WIDTH / 2, 90); }
   $('score').textContent = game.score; $('best').textContent = best; $('lives').textContent = '♥'.repeat(game.lives) || '0'; $('rally').textContent = game.rally;
   $('pause-btn').textContent = manualPause ? 'Resume' : 'Pause';
-  $('calibrate-btn').disabled = !stream || keyboard() || phase === 'over';
+  $('calibrate-btn').disabled = !stream || !cameraControls() || phase === 'over';
 }
 function frame(now) {
   const dt = Math.min((now - previous) / 1000 || 0, .1); previous = now;
   if (!document.hidden) { update(dt, now); draw(now); }
-  if (stream && !keyboard() && hands && !busy && video.readyState >= 2 && !document.hidden) {
+  if (stream && cameraControls() && hands && !busy && video.readyState >= 2 && !document.hidden) {
     busy = true; const token = generation; inferenceGeneration = token;
-    hands.send({ image: video }).catch(() => { if (token === generation) { stopCamera(); status('Hand tracking stopped. Restart the camera or choose Keyboard.'); } }).finally(() => { busy = false; });
+    hands.send({ image: video }).catch(() => { if (token === generation) { stopCamera(); status('Tracking stopped. Restart the camera or choose Keyboard.'); } }).finally(() => { busy = false; });
   }
   requestAnimationFrame(frame);
 }

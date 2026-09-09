@@ -1,6 +1,6 @@
 ﻿# Hand Pong
 
-A browser Pong game controlled by both hands or a keyboard. Keep the ball alive: every paddle return earns a point, and three misses end the run.
+A browser Pong game controlled by both hands, index fingers, or a keyboard. Keep the ball alive: every paddle return earns a point, and three misses end the run.
 
 ## Play locally
 
@@ -8,11 +8,12 @@ A browser Pong game controlled by both hands or a keyboard. Keep the ball alive:
 python -m http.server --directory public 3000
 ```
 
-Open http://localhost:3000. Choose **Keyboard** to play immediately, or **Enable camera** for hand tracking. Camera access requires localhost or HTTPS. MediaPipe loads from a pinned CDN version and requires an internet connection; camera frames are processed locally in the browser.
+Open http://localhost:3000. Choose **Keyboard** to play immediately, or **Enable camera** for hand or finger tracking. Camera access requires localhost or HTTPS. MediaPipe loads from a pinned CDN version and requires an internet connection; camera frames are processed locally in the browser.
 
 ## Controls and features
 
-- **Hand tracking:** Move both hands comfortably up and down during the four-second calibration. Each hand needs a visible vertical range; calibration repeats if the range is too small. Use Calibrate to adjust it again.
+- **Hand tracking:** Move both hands comfortably up and down during the four-second calibration. The paddle follows each palm center.
+- **Finger tracking:** Select Finger tracking to use each index fingertip as the paddle controller. Move both index fingers comfortably up and down during calibration.
 - **Tracking recovery:** Paddles retain their position during a 500 ms tracking grace period. Play then pauses until both hands return, followed by a ready countdown.
 - **Keyboard:** W/S moves the left paddle; up/down arrows move the right. Both paddles are player controlled, so you can play alone or share the keyboard.
 - **Space / Pause:** Pause or resume with a fresh countdown. Switching tabs or losing window focus also pauses play.
