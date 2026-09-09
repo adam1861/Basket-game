@@ -7,7 +7,27 @@ let calibrated = false, calibrationTime = 0, stableTime = 0, manualPause = false
 let samples = [[], []], ranges = [[.2, .8], [.2, .8]];
 let seen = [-Infinity, -Infinity], positions = [.5, .5], keys = new Set();
 let best = 0, announcement = '', announcementUntil = 0, audio = null;
+let player = { name: '', promo: '' }, runRecorded = false;
 try { best = Number(localStorage.getItem('hand-pong-best')) || 0; } catch { /* Storage is optional. */ }
+try { player = JSON.parse(localStorage.getItem('hand-pong-player')) || player; } catch { /* Storage is optional. */ }
+function leaderboard() {
+  try { return JSON.parse(localStorage.getItem('hand-pong-leaderboard')) || []; } catch { return []; }
+}
+function renderLeaderboard() {
+  const list = $('leaderboard-list'); if (!list || typeof document.createElement !== 'function') return;
+  const scores = leaderboard().sort((a, b) => b.score - a.score || a.name.localeCompare(b.name)).slice(0, 10);
+  list.replaceChildren(...(scores.length ? scores.map((entry, index) => {
+    const item = document.createElement('li'), identity = document.createElement('span'), rank = document.createElement('b'), promo = document.createElement('small'), score = document.createElement('strong');
+    rank.textContent = index + 1; identity.append(rank, document.createTextNode(entry.name), promo); promo.textContent = entry.promo; score.textContent = entry.score; item.append(identity, score); return item;
+  }) : [Object.assign(document.createElement('li'), { className: 'empty-leaderboard', textContent: 'No scores yet. Be the first.' })]));
+}
+function recordRun() {
+  if (runRecorded || !player.name || !player.promo) return;
+  runRecorded = true;
+  const scores = leaderboard(); scores.push({ name: player.name, promo: player.promo, score: game.score });
+  try { localStorage.setItem('hand-pong-leaderboard', JSON.stringify(scores.slice(-50))); } catch { /* Storage is optional. */ }
+  renderLeaderboard();
+}
 const keyboard = () => $('control-mode').value === 'keyboard';
 const status = (message) => { if ($('status').textContent !== message) $('status').textContent = message; };
 const tracked = (now) => keyboard() || (stream && seen.every((time) => now - time < 500));
@@ -23,6 +43,7 @@ function sound(frequency = 520) {
 }
 function reset() {
   game = createGame($('difficulty').value); accumulator = 0; manualPause = false; stableTime = 0; announcementUntil = 0;
+  runRecorded = false;
   phase = keyboard() || calibrated ? 'waiting' : 'idle';
   if (stream && !calibrated && !keyboard()) calibrate();
   status(keyboard() ? 'Keyboard ready. Get set!' : 'Enable your camera, then calibrate your hands.');
@@ -134,7 +155,7 @@ function update(dt, now) {
     }
     if (event === 'miss') {
       sound(160); accumulator = 0;
-      if (game.lives <= 0) { phase = 'over'; status(`Game over · ${game.score} points. Press R to play again.`); }
+      if (game.lives <= 0) { phase = 'over'; recordRun(); status(`Game over · ${game.score} points. Press R to play again.`); }
       else { serve(game, game.ball.vx > 0 ? -1 : 1); phase = 'waiting'; stableTime = 0; } break;
     }
   }
@@ -173,6 +194,7 @@ function pause() {
   status(manualPause ? 'Paused. Press Space or Resume.' : 'Get ready to resume…');
 }
 $('start-btn').addEventListener('click', startCamera);
+$('player-form')?.addEventListener('submit', (event) => { event.preventDefault(); player = { name: $('player-name').value.trim(), promo: $('player-promo').value.trim() }; try { localStorage.setItem('hand-pong-player', JSON.stringify(player)); } catch { /* Storage is optional. */ } document.querySelectorAll('.player-required').forEach((control) => { control.disabled = false; }); reset(); status(`Ready, ${player.name}. Choose your controls to begin.`); });
 $('reset-btn').addEventListener('click', reset);
 $('calibrate-btn').addEventListener('click', calibrate);
 $('pause-btn').addEventListener('click', pause);
@@ -195,4 +217,7 @@ window.addEventListener('blur', loseFocus);
 document.addEventListener('visibilitychange', () => { if (document.hidden) loseFocus(); previous = performance.now(); });
 window.addEventListener('pagehide', stopCamera);
 populateCameras().catch(() => status('Camera list unavailable. Try Enable camera or choose Keyboard.'));
+if ($('player-name')) $('player-name').value = player.name;
+if ($('player-promo')) $('player-promo').value = player.promo;
+renderLeaderboard();
 reset(); requestAnimationFrame(frame);
