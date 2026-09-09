@@ -21,8 +21,10 @@ body { margin: 0; min-height: 100vh; background: radial-gradient(ellipse at 85% 
 .brand-logo { display: block; width: 116px; height: auto; }
 .brand-motto { font-size: 10px; letter-spacing: .24em; color: var(--muted); text-transform: uppercase; }
 .brand-motto span { color: var(--green); padding: 0 9px; }
-.site-nav { margin-left: auto; }
+.site-nav { display: flex; align-self: stretch; margin-left: auto; gap: 4px; }
 .site-nav a, .text-link { color: var(--green); font-size: 11px; font-weight: 700; text-decoration: none; text-transform: uppercase; letter-spacing: .1em; }
+.site-nav a { display: flex; align-items: center; padding: 0 13px; border-bottom: 2px solid transparent; }
+.site-nav a.active { color: var(--white); border-bottom-color: var(--green); }
 .site-nav a:hover, .text-link:hover { color: var(--mint); }
 .header { position: relative; isolation: isolate; overflow: hidden; display: flex; justify-content: space-between; align-items: center; gap: 24px; min-height: 222px; padding: 30px 0; margin-bottom: 16px; }
 .header::before { content: ""; position: absolute; z-index: -1; width: 250px; height: 250px; right: 54px; top: -30px; border: 2px dashed var(--green); border-radius: 50%; box-shadow: 0 0 20px #00e67630, inset 0 0 20px #00e67618; transform: rotate(-25deg); opacity: .55; }
@@ -102,7 +104,7 @@ input { accent-color: var(--green); }
   .brand-logo { width: 88px; }
   .brand-motto { font-size: 8px; letter-spacing: .12em; }
   .brand-motto span { padding: 0 3px; }
-  .site-nav { width: 100%; margin-left: 0; }
+  .site-nav { width: 100%; margin-left: 0; min-height: 42px; }
   .badge { display: none; }
   .player-panel, .player-panel form { align-items: stretch; flex-direction: column; }
   .player-panel form { gap: 10px; }
