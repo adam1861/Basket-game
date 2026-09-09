@@ -21,6 +21,9 @@ body { margin: 0; min-height: 100vh; background: radial-gradient(ellipse at 85% 
 .brand-logo { display: block; width: 116px; height: auto; }
 .brand-motto { font-size: 10px; letter-spacing: .24em; color: var(--muted); text-transform: uppercase; }
 .brand-motto span { color: var(--green); padding: 0 9px; }
+.site-nav { margin-left: auto; }
+.site-nav a, .text-link { color: var(--green); font-size: 11px; font-weight: 700; text-decoration: none; text-transform: uppercase; letter-spacing: .1em; }
+.site-nav a:hover, .text-link:hover { color: var(--mint); }
 .header { position: relative; isolation: isolate; overflow: hidden; display: flex; justify-content: space-between; align-items: center; gap: 24px; min-height: 222px; padding: 30px 0; margin-bottom: 16px; }
 .header::before { content: ""; position: absolute; z-index: -1; width: 250px; height: 250px; right: 54px; top: -30px; border: 2px dashed var(--green); border-radius: 50%; box-shadow: 0 0 20px #00e67630, inset 0 0 20px #00e67618; transform: rotate(-25deg); opacity: .55; }
 .header::after { content: ""; position: absolute; z-index: -1; right: 0; bottom: 0; width: 230px; height: 100px; background-image: radial-gradient(#00c85370 1px, transparent 1px); background-size: 12px 12px; mask-image: linear-gradient(to left, black, transparent); }
@@ -72,6 +75,18 @@ h2::before { content: "↗"; color: var(--green); margin-right: 9px; }
 .leaderboard li small { color: var(--muted); font-size: 10px; }
 .leaderboard li strong { color: var(--green); font-size: 16px; }
 .leaderboard .empty-leaderboard { color: var(--muted); }
+.leaderboard-page { max-width: 860px; }
+.leaderboard-page .header { min-height: 180px; }
+.leaderboard-card { border: 1px solid var(--line); border-top: 2px solid var(--green); background: var(--surface); padding: 8px 24px 24px; }
+.leaderboard-card ol { list-style: none; padding: 0; margin: 0; }
+.leaderboard-card li { display: grid; grid-template-columns: 54px 1fr auto; align-items: center; gap: 16px; padding: 17px 0; border-bottom: 1px solid var(--line); }
+.leaderboard-card li:last-child { border-bottom: 0; }
+.leaderboard-card .rank { color: var(--green); font-family: var(--display); font-size: 20px; }
+.leaderboard-card .identity { display: flex; flex-direction: column; gap: 4px; font-size: 15px; }
+.leaderboard-card .identity small { color: var(--muted); font-size: 11px; }
+.leaderboard-card .points { color: var(--green); font-family: var(--display); font-size: 24px; }
+.leaderboard-card .empty-leaderboard { display: block; color: var(--muted); padding: 28px 0; }
+.leaderboard-actions { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 22px; }
 kbd { font: inherit; border: 1px solid #435048; border-radius: 3px; padding: 1px 5px; color: var(--white); }
 .preferences { display: flex; gap: 20px; flex-wrap: wrap; }
 .preferences label { display: flex; align-items: center; gap: 7px; cursor: pointer; }
@@ -87,6 +102,7 @@ input { accent-color: var(--green); }
   .brand-logo { width: 88px; }
   .brand-motto { font-size: 8px; letter-spacing: .12em; }
   .brand-motto span { padding: 0 3px; }
+  .site-nav { width: 100%; margin-left: 0; }
   .badge { display: none; }
   .player-panel, .player-panel form { align-items: stretch; flex-direction: column; }
   .player-panel form { gap: 10px; }
